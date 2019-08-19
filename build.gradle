@@ -1,13 +1,35 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven {
+            url "https://github.com/SciAps/nexus/raw/master/"
+        }
+        mavenCentral()
+        maven {
+            url 'https://maven.google.com/'
+            name 'Google'
+        }
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.3.2'
+    }
+}
+
 allprojects {
 
     group = 'com.dev-smart'
-    version = '0.1.7-SNAPSHOT'
+    version = '0.2.0'
     description = 'A embedded java webserver'
 
     repositories {
-        jcenter()
+        mavenLocal()
         maven {
-            url 'https://oss.sonatype.org/content/repositories/snapshots/'
+            url "https://github.com/SciAps/nexus/raw/master/"
+        }
+        mavenCentral()
+        maven {
+            url 'https://maven.google.com/'
+            name 'Google'
         }
     }
 }

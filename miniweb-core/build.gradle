@@ -1,8 +1,7 @@
 
 apply plugin: 'java'
-apply plugin: 'eclipse'
 apply plugin: 'maven'
-apply plugin: 'signing'
+apply plugin: 'maven-publish'
 
 compileJava {
     targetCompatibility = 1.6
@@ -10,19 +9,12 @@ compileJava {
 }
 
 dependencies {
-    compile 'org.apache.httpcomponents:httpcore:4.0.1'
-    //compile 'org.apache.httpcomponents:httpclient-android:4.3.5.1'
-    compile 'com.google.code.gson:gson:2.2.4'
-    compile 'org.slf4j:slf4j-api:1.7.8'
-    testCompile 'junit:junit:4.11'
-    testCompile 'org.slf4j:slf4j-simple:1.7.8'
-    testCompile 'org.apache.httpcomponents:httpclient:4.3.4'
-
-}
-
-task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = 'javadoc'
-    from 'build/docs/javadoc'
+    compile 'org.apache.httpcomponents:httpcore:4.4.11'
+    compile 'com.google.code.gson:gson:2.8.5'
+    compile 'org.slf4j:slf4j-api:1.7.25'
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.slf4j:slf4j-simple:1.7.25'
+    testCompile 'org.apache.httpcomponents:httpclient-android:4.3.5.1'
 }
 
 task sourceJar(type: Jar) {
@@ -31,53 +23,20 @@ task sourceJar(type: Jar) {
 }
 
 artifacts {
-    archives javadocJar
     archives sourceJar
 }
 
-signing {
-    sign configurations.archives
-}
-
-uploadArchives {
-    repositories.mavenDeployer {
-
-        beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-            authentication(userName: sonatypeUsername, password: sonatypePassword)
+publishing {
+    publications {
+        myLibrary(MavenPublication) {
+            from components.java
+            artifact(sourceJar)
         }
+    }
 
-        snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-            authentication(userName: sonatypeUsername, password: sonatypePassword)
+    repositories {
+        maven {
+            url "$buildDir/repo"
         }
-
-        pom.project {
-            name 'Miniweb-core'
-            description 'Miniweb is an embedded webserver for Java.'
-            url 'http://github.com/dinocore1/MiniWeb'
-
-            scm {
-                url 'scm:git@github.com:dinocore1/MiniWeb.git'
-                connection 'scm:git@github.com:dinocore1/MiniWeb.git'
-                developerConnection 'scm:git@github.com:dinocore1/MiniWeb.git'
-            }
-
-            licenses {
-                license {
-                    name 'MIT License'
-                    url 'https://github.com/dinocore1/MiniWeb/blob/master/LICENSE.txt'
-                    distribution 'repo'
-                }
-            }
-
-            developers {
-                developer {
-                    id 'psoucy'
-                    name 'Paul Soucy'
-                }
-            }
-        }
-
     }
 }
