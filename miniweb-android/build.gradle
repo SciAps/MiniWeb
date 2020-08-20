@@ -11,7 +11,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.3.2'
+        classpath 'com.android.tools.build:gradle:3.5.4'
     }
 }
 
@@ -21,10 +21,10 @@ apply plugin: 'maven-publish'
 
 android {
     compileSdkVersion 28
-    buildToolsVersion "28.0.3"
 
     defaultConfig {
         minSdkVersion 17
+        //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 22
         versionCode 1
         versionName "1.0"
@@ -32,6 +32,8 @@ android {
 
     buildTypes {
         release {
+        }
+        debug {
         }
     }
 
@@ -42,10 +44,11 @@ android {
 }
 
 dependencies {
-    compile project(':miniweb-core')
-    compile 'com.android.support:appcompat-v7:26.0.0-beta1'
-    compile 'com.google.code.gson:gson:2.8.5'
-    compile 'org.slf4j:slf4j-api:1.7.25'
+    implementation project(':miniweb-core')
+    implementation 'org.apache.httpcomponents:httpcore:4.3'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.code.gson:gson:2.8.6'
+    implementation 'org.slf4j:slf4j-api:1.7.30'
 }
 
 task androidSourcesJar(type: Jar) {

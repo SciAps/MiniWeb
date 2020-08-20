@@ -1,19 +1,30 @@
 package com.devsmart.miniweb;
 
-import org.apache.http.*;
+import org.apache.http.ConnectionClosedException;
+import org.apache.http.HttpException;
 import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.DefaultHttpResponseFactory;
 import org.apache.http.impl.DefaultHttpServerConnection;
-import org.apache.http.message.BasicStatusLine;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
-import org.apache.http.protocol.*;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.BasicHttpProcessor;
+import org.apache.http.protocol.HttpRequestHandlerResolver;
+import org.apache.http.protocol.HttpService;
+import org.apache.http.protocol.ResponseConnControl;
+import org.apache.http.protocol.ResponseContent;
+import org.apache.http.protocol.ResponseDate;
+import org.apache.http.protocol.ResponseServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.*;
-import java.util.concurrent.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
 
@@ -30,12 +41,13 @@ public class Server {
     private BasicHttpContext mContext = new BasicHttpContext();
 
     public void start() throws IOException {
-        if(mRunning){
+        if (mRunning) {
             LOGGER.warn("server already running");
             return;
         }
 
         mServerSocket = new ServerSocket(port);
+        mServerSocket.setReuseAddress(true);
         LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
 
         mRunning = true;
@@ -43,12 +55,16 @@ public class Server {
         mListenThread = new SocketListener();
         mListenThread.setName("MiniWeb Listen " + mServerSocket.getLocalSocketAddress());
         mListenThread.start();
-
     }
 
     public void shutdown() {
-        if(mRunning){
+        if (mRunning) {
             mRunning = false;
+            try {
+                mServerSocket.close();
+            } catch (IOException e) {
+                LOGGER.error("Could not close socket:", e);
+            }
             try {
                 mListenThread.join();
                 mListenThread = null;
@@ -64,35 +80,28 @@ public class Server {
         private final HttpService httpservice;
         private final RemoteConnection remoteConnection;
 
-        public WorkerTask(HttpService service, RemoteConnection connection){
+        public WorkerTask(HttpService service, RemoteConnection connection) {
             httpservice = service;
             remoteConnection = connection;
         }
 
-
         @Override
         public void run() {
-
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
                     httpservice.handleRequest(remoteConnection.connection, mContext);
                 }
             } catch (ConnectionClosedException e) {
                 LOGGER.debug("client closed connection {}", remoteConnection.connection);
-
             } catch (IOException e) {
                 LOGGER.warn("IO error: " + e.getMessage());
-
             } catch (HttpException e) {
                 LOGGER.warn("Unrecoverable HTTP protocol violation: " + e.getMessage());
-
             } catch (Exception e){
                 LOGGER.warn("unknown error: {}", e);
             } finally {
                 shutdown();
             }
-
-
         }
 
         public void shutdown() {
@@ -101,7 +110,6 @@ public class Server {
             } catch (IOException e){
                 LOGGER.error("", e);
             }
-
         }
     }
 
@@ -122,7 +130,7 @@ public class Server {
             httpService.setHandlerResolver(requestHandlerResolver);
             httpService.setParams(params);
 
-            while(mRunning){
+            while (mRunning) {
                 try {
                     Socket socket = mServerSocket.accept();
 
@@ -134,13 +142,16 @@ public class Server {
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
 
-                } catch(SocketTimeoutException e) {
-                } catch (IOException e){
+                } catch (SocketTimeoutException e) {
+                    continue;
+                } catch (SocketException e) {
+                    LOGGER.info("SocketListener shutting down");
+                    mRunning = false;
+                } catch (IOException e) {
                     LOGGER.error("", e);
                     mRunning = false;
                 }
             }
         }
     }
-
 }
