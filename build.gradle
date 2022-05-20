@@ -1,9 +1,6 @@
 buildscript {
     repositories {
         mavenLocal()
-        maven {
-            url "https://github.com/SciAps/nexus/raw/master/"
-        }
         mavenCentral()
         maven {
             url 'https://maven.google.com/'
@@ -23,9 +20,6 @@ allprojects {
 
     repositories {
         mavenLocal()
-        maven {
-            url "https://github.com/SciAps/nexus/raw/master/"
-        }
         mavenCentral()
         maven {
             url 'https://maven.google.com/'
