@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -34,6 +35,7 @@ public class Server {
     HttpRequestHandlerResolver requestHandlerResolver;
 
     private final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
+    public static final String ORIGIN = "origin";
 
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
@@ -46,8 +48,9 @@ public class Server {
             return;
         }
 
-        mServerSocket = new ServerSocket(port);
+        mServerSocket = new ServerSocket();
         mServerSocket.setReuseAddress(true);
+        mServerSocket.bind(new InetSocketAddress(port));
         LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
 
         mRunning = true;
@@ -89,16 +92,18 @@ public class Server {
         public void run() {
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
+                    LOGGER.info("handling request {}", remoteConnection.connection);
+                    mContext.setAttribute(ORIGIN, remoteConnection.remoteAddress);
                     httpservice.handleRequest(remoteConnection.connection, mContext);
                 }
             } catch (ConnectionClosedException e) {
-                LOGGER.debug("client closed connection {}", remoteConnection.connection);
+                LOGGER.info("client closed connection {}", remoteConnection.connection);
             } catch (IOException e) {
                 LOGGER.warn("IO error: " + e.getMessage());
             } catch (HttpException e) {
                 LOGGER.warn("Unrecoverable HTTP protocol violation: " + e.getMessage());
             } catch (Exception e){
-                LOGGER.warn("unknown error: {}", e);
+                LOGGER.warn("unknown error:", e);
             } finally {
                 shutdown();
             }
@@ -132,8 +137,8 @@ public class Server {
 
             while (mRunning) {
                 try {
+                    LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
                     Socket socket = mServerSocket.accept();
-
                     LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
 
                     DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
@@ -141,7 +146,6 @@ public class Server {
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-
                 } catch (SocketTimeoutException e) {
                     continue;
                 } catch (SocketException e) {
