@@ -92,7 +92,6 @@ public class Server {
         public void run() {
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
-                    LOGGER.info("handling request {}", remoteConnection.connection);
                     mContext.setAttribute(ORIGIN, remoteConnection.remoteAddress);
                     httpservice.handleRequest(remoteConnection.connection, mContext);
                 }
