@@ -18,6 +18,7 @@ import java.util.Map;
 public class ReflectionControllerRequestHandler implements HttpRequestHandler {
 
     public static final String PATH_VARS = "path_vars";
+    public static final String ORIGIN = "origin";
 
     private final String mPrefix;
     private final List<ControllerInvoker> mInvokers;
@@ -50,6 +51,7 @@ public class ReflectionControllerRequestHandler implements HttpRequestHandler {
                 if(invoker.pathEndpoint.matches(endpoint)){
                     Map<String, String> pathVars = invoker.pathEndpoint.parseUri(endpoint);
                     request.getParams().setParameter(PATH_VARS, pathVars);
+                    request.getParams().setParameter(ORIGIN, context.getAttribute(ORIGIN));
                     invoker.handle(request, response, context);
                     handled = true;
                     break;
