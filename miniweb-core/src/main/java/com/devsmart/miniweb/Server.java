@@ -34,7 +34,7 @@ public class Server {
     int port;
     HttpRequestHandlerResolver requestHandlerResolver;
 
-    private final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
+    private final ExecutorService mWorkerThreads = Executors.newFixedThreadPool(800);
     public static final String ORIGIN = "origin";
 
     private ServerSocket mServerSocket;
