@@ -134,10 +134,11 @@ public class Server {
             httpService.setHandlerResolver(requestHandlerResolver);
             httpService.setParams(params);
 
+            Socket socket = null;
             while (mRunning) {
                 try {
                     LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
-                    Socket socket = mServerSocket.accept();
+                    socket = mServerSocket.accept();
                     LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
 
                     DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
@@ -153,6 +154,14 @@ public class Server {
                 } catch (IOException e) {
                     LOGGER.error("", e);
                     mRunning = false;
+                }
+            }
+            if (socket != null) {
+                try {
+                    socket.close();
+                    LOGGER.info("Connection is closed properly");
+                } catch (IOException e) {
+                    LOGGER.error("Can't close connection. Reason: ", e);
                 }
             }
         }
