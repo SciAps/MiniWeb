@@ -1,17 +1,17 @@
-
+apply from: "$project.rootDir/versions.gradle"
 apply plugin: 'java'
 
 compileJava {
-    targetCompatibility = 1.8
-    sourceCompatibility = 1.8
+    targetCompatibility = versions.javaVersion
+    sourceCompatibility = versions.javaVersion
 }
 
 dependencies {
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation 'com.google.code.gson:gson:2.8.9'
-    implementation 'org.slf4j:slf4j-api:1.7.32'
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.slf4j:slf4j-simple:1.7.30'
+    implementation dependency.gson
+    implementation dependency.slf4jApi
+    testImplementation dependency.junit
+    testImplementation dependency.slf4jSimple
     testImplementation 'org.apache.httpcomponents:httpclient:4.3'
 }
 
