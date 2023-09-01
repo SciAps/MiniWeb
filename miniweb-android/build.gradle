@@ -1,3 +1,4 @@
+apply from: "$project.rootDir/versions.gradle"
 
 buildscript {
     repositories {
@@ -11,7 +12,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.4'
+        classpath dependency.gradle
     }
 }
 
@@ -20,12 +21,12 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion versions.compileSdkVersion
 
     defaultConfig {
-        minSdkVersion 17
+        minSdkVersion versions.minSdkVersion
         //noinspection ExpiredTargetSdkVersion
-        targetSdkVersion 22
+        targetSdkVersion versions.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
@@ -46,9 +47,8 @@ android {
 dependencies {
     implementation project(':libraries:MiniWeb:miniweb-core')
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.google.code.gson:gson:2.8.9'
-    implementation 'org.slf4j:slf4j-api:1.7.32'
+    implementation dependency.gson
+    implementation dependency.slf4jApi
 }
 
 task androidSourcesJar(type: Jar) {
