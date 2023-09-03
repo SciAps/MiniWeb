@@ -10,15 +10,9 @@ buildscript {
             name 'Google'
         }
     }
-
-    dependencies {
-        classpath dependency.gradle
-    }
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'maven'
-apply plugin: 'maven-publish'
 
 android {
     compileSdkVersion versions.compileSdkVersion
@@ -47,30 +41,7 @@ android {
 dependencies {
     implementation project(':libraries:MiniWeb:miniweb-core')
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation dependency.gson
-    implementation dependency.slf4jApi
+    implementation "com.google.code.gson:gson:$versions.gsonVersion"
+    implementation "org.slf4j:slf4j-api:$versions.slf4jApiVersion"
 }
 
-task androidSourcesJar(type: Jar) {
-    classifier = 'sources'
-    from android.sourceSets.main.java.srcDirs
-}
-
-artifacts() {
-    archives androidSourcesJar
-}
-
-publishing {
-    publications {
-        myLibrary(MavenPublication) {
-            artifact(androidSourcesJar)
-            artifact("$buildDir/outputs/aar/miniweb-android-release.aar")
-        }
-    }
-
-    repositories {
-        maven {
-            url "$buildDir/repo"
-        }
-    }
-}
