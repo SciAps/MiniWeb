@@ -30,11 +30,11 @@ android {
         }
     }
 
-    lintOptions {
+    namespace 'com.devsmart.miniweb'
+    lint {
         abortOnError false
         disable 'InvalidPackage'
     }
-    namespace 'com.devsmart.miniweb'
 }
 
 dependencies {
