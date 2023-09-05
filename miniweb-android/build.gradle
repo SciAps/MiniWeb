@@ -17,8 +17,6 @@ android {
         minSdkVersion versions.minSdkVersion
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion versions.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
     }
 
     buildTypes {
@@ -32,6 +30,7 @@ android {
         abortOnError false
         disable 'InvalidPackage'
     }
+    namespace 'com.devsmart.miniweb'
 }
 
 dependencies {

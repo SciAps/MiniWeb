@@ -14,12 +14,3 @@ dependencies {
     testImplementation "org.slf4j:slf4j-simple:$versions.slf4jApiVersion"
     testImplementation 'org.apache.httpcomponents:httpclient:4.3'
 }
-
-task sourceJar(type: Jar) {
-    classifier = 'sources'
-    from sourceSets.main.allSource
-}
-
-artifacts {
-    archives sourceJar
-}
