@@ -19,11 +19,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 
 public class ParamHandlerFactory {
 
@@ -142,7 +145,13 @@ public class ParamHandlerFactory {
             public Object createParam(HttpRequest request, HttpResponse response, HttpContext context, ControllerInvoker controllerInvoker) {
 
                 final String uri = request.getRequestLine().getUri();
-                Map<String, List<String>> params = UriQueryParser.getUrlParameters(uri);
+                Map<String, List<String>> params;
+                try {
+                    params = UriQueryParser.getUrlParameters(uri);
+                } catch (ProtocolException e) {
+                    response.setStatusCode(SC_BAD_REQUEST);
+                    return null;
+                }
 
                 List<String> values = params.get(paramKey.value());
                 if (values != null) {
