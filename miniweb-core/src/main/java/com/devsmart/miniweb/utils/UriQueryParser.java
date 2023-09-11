@@ -2,6 +2,7 @@ package com.devsmart.miniweb.utils;
 
 
 import java.io.UnsupportedEncodingException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ public class UriQueryParser {
 
     }
 
-    public static Map<String, List<String>> getUrlParameters(String url) {
+    public static Map<String, List<String>> getUrlParameters(String url) throws ProtocolException {
         try {
 
             final Map<String, List<String>> query_pairs = new LinkedHashMap<String, List<String>>();
@@ -62,6 +63,8 @@ public class UriQueryParser {
 
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
+        } catch (IllegalArgumentException e) {
+            throw new ProtocolException(e.getMessage());
         }
     }
 }
