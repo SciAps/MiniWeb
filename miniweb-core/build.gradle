@@ -8,9 +8,10 @@ compileJava {
 
 dependencies {
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation "com.google.code.gson:gson:$versions.gsonVersion"
-    implementation "org.slf4j:slf4j-api:$versions.slf4jApiVersion"
-    testImplementation "junit:junit:$versions.junitVersion"
-    testImplementation "org.slf4j:slf4j-simple:$versions.slf4jApiVersion"
+    implementation "$dependency.gson"
+    implementation "$dependency.slf4jApi"
+
+    testImplementation "$dependency.junit"
+    testImplementation "$dependency.slf4jApi"
     testImplementation 'org.apache.httpcomponents:httpclient:4.3'
 }
