@@ -34,13 +34,13 @@ public class Server {
     int port;
     HttpRequestHandlerResolver requestHandlerResolver;
 
-    private final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
+    private static final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
     public static final String ORIGIN = "origin";
 
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
     private boolean mRunning = false;
-    private BasicHttpContext mContext = new BasicHttpContext();
+    private final BasicHttpContext mContext = new BasicHttpContext();
 
     public void start() throws IOException {
         if (mRunning) {
@@ -96,21 +96,22 @@ public class Server {
                     httpservice.handleRequest(remoteConnection.connection, mContext);
                 }
             } catch (ConnectionClosedException e) {
-                LOGGER.info("client closed connection {}", remoteConnection.connection);
+                LOGGER.info("Client closed connection {}", remoteConnection.connection);
             } catch (IOException e) {
-                LOGGER.warn("IO error: " + e.getMessage());
+                LOGGER.warn("IO error - {}: {}", remoteConnection.connection, e.getMessage());
             } catch (HttpException e) {
-                LOGGER.warn("Unrecoverable HTTP protocol violation: " + e.getMessage());
+                LOGGER.warn("Unrecoverable HTTP protocol violation - {}: {}", remoteConnection.connection, e.getMessage());
             } catch (Exception e){
-                LOGGER.warn("unknown error:", e);
+                LOGGER.warn("unknown error - {}", remoteConnection.connection, e);
             } finally {
-                shutdown();
+                LOGGER.info("Closing connection {}", remoteConnection.connection);
+                closeConnection();
             }
         }
 
-        public void shutdown() {
+        public void closeConnection() {
             try {
-                remoteConnection.connection.shutdown();
+                remoteConnection.connection.close();
             } catch (IOException e){
                 LOGGER.error("", e);
             }
