@@ -14,12 +14,18 @@ import java.io.File;
 public class ServerBuilder {
 
     private int mPort = 8080;
+    private boolean mIsAdvancedLoggingEnabled;
     private HttpRequestHandlerResolver mRequestHandler;
     private UriRequestHandlerResolver mUriMapper = new UriRequestHandlerResolver();
     private Gson mGson = new GsonBuilder().create();
 
     public ServerBuilder port(int port) {
         mPort = port;
+        return this;
+    }
+
+    public ServerBuilder setAdvancedLoggingEnabled(boolean isAdvancedLoggingEnabled) {
+        mIsAdvancedLoggingEnabled = isAdvancedLoggingEnabled;
         return this;
     }
 
@@ -69,6 +75,7 @@ public class ServerBuilder {
     public Server create() {
         Server server = new Server();
         server.port = mPort;
+        server.isAdvancedLoggingEnabled = mIsAdvancedLoggingEnabled;
         if(mRequestHandler == null){
             mRequestHandler = mUriMapper;
         }
