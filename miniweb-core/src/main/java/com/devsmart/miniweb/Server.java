@@ -43,7 +43,6 @@ public class Server {
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
     private boolean mRunning = false;
-    private final BasicHttpContext mContext = new BasicHttpContext();
 
     public void start() throws IOException {
         if (mRunning) {
@@ -95,11 +94,12 @@ public class Server {
         public void run() {
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
-                    mContext.setAttribute(ORIGIN, remoteConnection.remoteAddress);
-                    httpservice.handleRequest(remoteConnection.connection, mContext);
+                    BasicHttpContext context = new BasicHttpContext();
+                    context.setAttribute(ORIGIN, remoteConnection.remoteAddress);
+                    httpservice.handleRequest(remoteConnection.connection, context);
                     if (isAdvancedLoggingEnabled
-                            && mContext.getAttribute(HttpCoreContext.HTTP_REQUEST) instanceof HttpRequest) {
-                        HttpRequest request = (HttpRequest) mContext.getAttribute(HttpCoreContext.HTTP_REQUEST);
+                            && context.getAttribute(HttpCoreContext.HTTP_REQUEST) instanceof HttpRequest) {
+                        HttpRequest request = (HttpRequest) context.getAttribute(HttpCoreContext.HTTP_REQUEST);
                         LOGGER.info("Handled request: {}", request.getRequestLine().getUri());
                     }
                 }
