@@ -2,6 +2,7 @@ package com.devsmart.miniweb;
 
 import org.apache.http.ConnectionClosedException;
 import org.apache.http.HttpException;
+import org.apache.http.HttpRequest;
 import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.DefaultHttpResponseFactory;
 import org.apache.http.impl.DefaultHttpServerConnection;
@@ -9,6 +10,7 @@ import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.BasicHttpProcessor;
+import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.protocol.HttpRequestHandlerResolver;
 import org.apache.http.protocol.HttpService;
 import org.apache.http.protocol.ResponseConnControl;
@@ -32,6 +34,7 @@ public class Server {
     private static final Logger LOGGER = LoggerFactory.getLogger(Server.class);
 
     int port;
+    boolean isAdvancedLoggingEnabled;
     HttpRequestHandlerResolver requestHandlerResolver;
 
     private static final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
@@ -40,7 +43,6 @@ public class Server {
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
     private boolean mRunning = false;
-    private final BasicHttpContext mContext = new BasicHttpContext();
 
     public void start() throws IOException {
         if (mRunning) {
@@ -92,8 +94,14 @@ public class Server {
         public void run() {
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
-                    mContext.setAttribute(ORIGIN, remoteConnection.remoteAddress);
-                    httpservice.handleRequest(remoteConnection.connection, mContext);
+                    BasicHttpContext context = new BasicHttpContext();
+                    context.setAttribute(ORIGIN, remoteConnection.remoteAddress);
+                    httpservice.handleRequest(remoteConnection.connection, context);
+                    if (isAdvancedLoggingEnabled
+                            && context.getAttribute(HttpCoreContext.HTTP_REQUEST) instanceof HttpRequest) {
+                        HttpRequest request = (HttpRequest) context.getAttribute(HttpCoreContext.HTTP_REQUEST);
+                        LOGGER.info("Handled request: {}", request.getRequestLine().getUri());
+                    }
                 }
             } catch (ConnectionClosedException e) {
                 LOGGER.info("Client closed connection {}", remoteConnection.connection);
