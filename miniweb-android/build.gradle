@@ -1,4 +1,4 @@
-apply from: "$project.rootDir/versions.gradle"
+apply from: "$project.rootDir/libraries/DependencyVersions/versions.gradle"
 
 buildscript {
     repositories {
