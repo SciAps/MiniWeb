@@ -1,25 +1,16 @@
-apply from: "$project.rootDir/versions.gradle"
 apply plugin: 'java'
 
 compileJava {
-    targetCompatibility = versions.javaVersion
-    sourceCompatibility = versions.javaVersion
+    targetCompatibility = 1.8
+    sourceCompatibility = 1.8
 }
 
 dependencies {
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation dependency.gson
-    implementation dependency.slf4jApi
-    testImplementation dependency.junit
-    testImplementation dependency.slf4jSimple
+    implementation 'com.google.code.gson:gson:2.8.9'
+    implementation 'org.slf4j:slf4j-api:1.7.32'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.slf4j:slf4j-api:1.7.32'
     testImplementation 'org.apache.httpcomponents:httpclient:4.3'
-}
-
-task sourceJar(type: Jar) {
-    classifier = 'sources'
-    from sourceSets.main.allSource
-}
-
-artifacts {
-    archives sourceJar
 }

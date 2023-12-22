@@ -1,4 +1,4 @@
-apply from: "$project.rootDir/versions.gradle"
+apply from: "$project.rootDir/libraries/DependencyVersions/versions.gradle"
 
 buildscript {
     repositories {
@@ -6,15 +6,9 @@ buildscript {
         google()
         mavenCentral()
     }
-
-    dependencies {
-        classpath dependency.gradle
-    }
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'maven'
-apply plugin: 'maven-publish'
 
 android {
     compileSdkVersion versions.compileSdkVersion
@@ -23,8 +17,6 @@ android {
         minSdkVersion versions.minSdkVersion
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion versions.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
     }
 
     buildTypes {
@@ -34,7 +26,8 @@ android {
         }
     }
 
-    lintOptions {
+    namespace 'com.devsmart.miniweb'
+    lint {
         abortOnError false
         disable 'InvalidPackage'
     }
@@ -43,30 +36,7 @@ android {
 dependencies {
     implementation project(':libraries:MiniWeb:miniweb-core')
     implementation 'org.apache.httpcomponents:httpcore:4.3'
-    implementation dependency.gson
-    implementation dependency.slf4jApi
+    implementation "$dependency.gson"
+    implementation "$dependency.slf4jApi"
 }
 
-task androidSourcesJar(type: Jar) {
-    classifier = 'sources'
-    from android.sourceSets.main.java.srcDirs
-}
-
-artifacts() {
-    archives androidSourcesJar
-}
-
-publishing {
-    publications {
-        myLibrary(MavenPublication) {
-            artifact(androidSourcesJar)
-            artifact("$buildDir/outputs/aar/miniweb-android-release.aar")
-        }
-    }
-
-    repositories {
-        maven {
-            url "$buildDir/repo"
-        }
-    }
-}
