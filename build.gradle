@@ -11,10 +11,4 @@ allprojects {
     group = 'com.dev-smart'
     version = '0.2.0'
     description = 'A embedded java webserver'
-
-    repositories {
-        mavenLocal()
-        google()
-        mavenCentral()
-    }
 }
