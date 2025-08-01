@@ -35,6 +35,7 @@ public class Server {
 
     int port;
     boolean isAdvancedLoggingEnabled;
+    boolean mIsDebugBuild;
     HttpRequestHandlerResolver requestHandlerResolver;
 
     private static final ExecutorService mWorkerThreads = Executors.newCachedThreadPool();
@@ -53,7 +54,9 @@ public class Server {
         mServerSocket = new ServerSocket();
         mServerSocket.setReuseAddress(true);
         mServerSocket.bind(new InetSocketAddress(port));
-        LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
+        if (mIsDebugBuild) {
+            LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
+        }
 
         mRunning = true;
 
@@ -146,9 +149,13 @@ public class Server {
             Socket socket = null;
             while (mRunning) {
                 try {
-                    LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
+                    if (mIsDebugBuild) {
+                        LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
+                    }
                     socket = mServerSocket.accept();
-                    LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
+                    if (mIsDebugBuild) {
+                        LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
+                    }
 
                     DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
                     connection.bind(socket, new BasicHttpParams());

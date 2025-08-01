@@ -22,9 +22,11 @@ public class ControllerBuilder {
     private LinkedList<ControllerInvoker> mInvokers = new LinkedList<ControllerInvoker>();
     private String mPrefix;
     private Gson mGson;
+    private final boolean mIsDebugBuild;
 
-    public ControllerBuilder(Gson gson) {
+    public ControllerBuilder(Gson gson, boolean isDebugBuild) {
         mGson = gson;
+        mIsDebugBuild = isDebugBuild;
     }
 
     private static String trimPath(String path) {
@@ -80,10 +82,14 @@ public class ControllerBuilder {
 
                     }
 
-                    if(!allHandlersResolved){
-                        logger.warn("Could not resolve handler {}:{}", controllerClass.getName(), method.getName());
+                    if (!allHandlersResolved) {
+                        if (mIsDebugBuild) {
+                            logger.warn("Could not resolve handler {}:{}", controllerClass.getName(), method.getName());
+                        }
                     } else {
-                        logger.info("Mapped {} {}{} --> {}:{}", caller.requestMethod, caller.pathPrefix, caller.pathEndpoint, controllerClass.getName(), method.getName());
+                        if (mIsDebugBuild) {
+                            logger.info("Mapped {} {}{} --> {}:{}", caller.requestMethod, caller.pathPrefix, caller.pathEndpoint, controllerClass.getName(), method.getName());
+                        }
                         mInvokers.add(caller);
 
                     }
