@@ -112,7 +112,7 @@ public class ReflectionControllerTest {
 
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
             .addController(controller)
             .withPathPrefix("/")
             .create();
@@ -134,7 +134,7 @@ public class ReflectionControllerTest {
     public void testIntQueryParam() throws Exception {
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();
@@ -153,7 +153,7 @@ public class ReflectionControllerTest {
     public void testJsonBody() throws Exception {
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();
@@ -178,7 +178,7 @@ public class ReflectionControllerTest {
     public void testJsonResponse() throws Exception {
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();
@@ -206,7 +206,7 @@ public class ReflectionControllerTest {
 
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();
@@ -238,7 +238,7 @@ public class ReflectionControllerTest {
     public void testPathVar() throws Exception {
         MyController controller = new MyController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();
@@ -282,7 +282,7 @@ public class ReflectionControllerTest {
 
         MyInheritController controller = new MyInheritController();
 
-        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create())
+        ReflectionControllerRequestHandler handler = new ControllerBuilder(new GsonBuilder().create(), true)
                 .addController(controller)
                 .withPathPrefix("/")
                 .create();

@@ -18,6 +18,12 @@ public class ServerBuilder {
     private HttpRequestHandlerResolver mRequestHandler;
     private UriRequestHandlerResolver mUriMapper = new UriRequestHandlerResolver();
     private Gson mGson = new GsonBuilder().create();
+    private boolean mIsDebugBuild;
+
+    public ServerBuilder setDebugBuild(boolean isDebug) {
+        mIsDebugBuild = isDebug;
+        return this;
+    }
 
     public ServerBuilder port(int port) {
         mPort = port;
@@ -48,7 +54,7 @@ public class ServerBuilder {
     }
 
     public ServerBuilder mapController(String pattern, Object... controllers) {
-        ControllerBuilder builder = new ControllerBuilder(mGson);
+        ControllerBuilder builder = new ControllerBuilder(mGson, mIsDebugBuild);
         builder.withPathPrefix(trimPattern(pattern));
         for(Object controller : controllers){
             builder.addController(controller);
@@ -76,6 +82,7 @@ public class ServerBuilder {
         Server server = new Server();
         server.port = mPort;
         server.isAdvancedLoggingEnabled = mIsAdvancedLoggingEnabled;
+        server.mIsDebugBuild = mIsDebugBuild;
         if(mRequestHandler == null){
             mRequestHandler = mUriMapper;
         }
