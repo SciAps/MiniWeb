@@ -1,8 +1,9 @@
 apply plugin: 'java'
+apply from: "$project.rootDir/libraries/DependencyVersions/versions.gradle"
 
 compileJava {
-    targetCompatibility = 1.8
-    sourceCompatibility = 1.8
+    targetCompatibility = versions.javaVersion
+    sourceCompatibility = versions.javaVersion
 }
 
 dependencies {
