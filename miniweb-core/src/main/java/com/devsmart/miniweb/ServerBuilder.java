@@ -1,7 +1,5 @@
 package com.devsmart.miniweb;
 
-
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -10,6 +8,7 @@ import org.apache.http.protocol.HttpRequestHandlerResolver;
 import com.devsmart.miniweb.handlers.FileSystemRequestHandler;
 
 import java.io.File;
+import java.security.cert.X509Certificate;
 
 public class ServerBuilder {
 
@@ -19,7 +18,7 @@ public class ServerBuilder {
     private UriRequestHandlerResolver mUriMapper = new UriRequestHandlerResolver();
     private Gson mGson = new GsonBuilder().create();
     private boolean mIsDebugBuild;
-
+    private String mKeyStorePath;
     public ServerBuilder setDebugBuild(boolean isDebug) {
         mIsDebugBuild = isDebug;
         return this;
@@ -87,7 +86,16 @@ public class ServerBuilder {
             mRequestHandler = mUriMapper;
         }
         server.requestHandlerResolver = mRequestHandler;
+        try {
+            server.setSslContext(mKeyStorePath);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         return server;
+    }
+
+    public void setKeyStorePathAndPasswords(String keyStorePath) {
+        mKeyStorePath = keyStorePath;
     }
 }

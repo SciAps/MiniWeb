@@ -20,14 +20,25 @@ import org.apache.http.protocol.ResponseServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import javax.net.ServerSocketFactory;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
 
 public class Server {
 
@@ -44,6 +55,23 @@ public class Server {
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
     private boolean mRunning = false;
+    private SSLContext sslContext;
+    private boolean sslEnabled = false;
+
+    public void setSslContext(String keystorePath) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (FileInputStream fis = new FileInputStream(keystorePath)) {
+            keyStore.load(fis, CaCertificateLoader.getCertificatePassword());
+        }
+
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, CaCertificateLoader.getCertificatePassword());
+
+        sslContext = SSLContext.getInstance("TLS");
+        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(CaCertificateLoader.getCaCertificate())};
+        sslContext.init(kmf.getKeyManagers(), trustManagers, null);
+        sslEnabled = true;
+    }
 
     public void start() throws IOException {
         if (mRunning) {
@@ -51,7 +79,15 @@ public class Server {
             return;
         }
 
-        mServerSocket = new ServerSocket();
+        if (sslEnabled && sslContext != null) {
+            SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+            mServerSocket = factory.createServerSocket();
+            ((SSLServerSocket) mServerSocket).setNeedClientAuth(true);
+        } else {
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
+            mServerSocket = factory.createServerSocket();
+        }
+
         mServerSocket.setReuseAddress(true);
         mServerSocket.bind(new InetSocketAddress(port));
         if (mIsDebugBuild) {
@@ -66,20 +102,32 @@ public class Server {
     }
 
     public void shutdown() {
-        if (mRunning) {
-            mRunning = false;
-            try {
-                mServerSocket.close();
-            } catch (IOException e) {
-                LOGGER.error("Could not close socket:", e);
-            }
-            try {
-                mListenThread.join();
-                mListenThread = null;
-            } catch (InterruptedException e) {
-                LOGGER.error("", e);
-            }
-            LOGGER.info("Server shutdown");
+        if (!mRunning) {
+            return;
+        }
+        mRunning = false;
+        try {
+            mServerSocket.close();
+        } catch (IOException e) {
+            LOGGER.error("Could not close socket:", e);
+        }
+        try {
+            mListenThread.join();
+            mListenThread = null;
+        } catch (InterruptedException e) {
+            LOGGER.error("Interrupted waiting for listener thread to join", e);
+            Thread.currentThread().interrupt();
+        }
+        LOGGER.info("Server shutdown");
+    }
+
+    private static final class RemoteConnection {
+        final java.net.InetAddress remoteAddress;
+        final DefaultHttpServerConnection connection;
+
+        RemoteConnection(java.net.InetAddress addr, DefaultHttpServerConnection conn) {
+            this.remoteAddress = addr;
+            this.connection = conn;
         }
     }
 
@@ -116,16 +164,23 @@ public class Server {
                 LOGGER.warn("unknown error - {}", remoteConnection.connection, e);
             } finally {
                 LOGGER.info("Closing connection {}", remoteConnection.connection);
-                closeConnection();
+                try {
+                    // Try a graceful shutdown first
+                    try {
+                        remoteConnection.connection.shutdown();
+                    } catch (UnsupportedOperationException uoe) {
+                        // SSLSocket may not support half-close; ignore
+                    }
+                } catch (IOException ignore) {}
+                try {
+                    remoteConnection.connection.close();
+                } catch (UnsupportedOperationException uoe) {
+                    // Ignore half-close attempts on SSLSocket
+                } catch (IOException e) {
+                    LOGGER.error("Error closing connection", e);
+                }
             }
-        }
 
-        public void closeConnection() {
-            try {
-                remoteConnection.connection.close();
-            } catch (IOException e){
-                LOGGER.error("", e);
-            }
         }
     }
 
@@ -146,20 +201,34 @@ public class Server {
             httpService.setHandlerResolver(requestHandlerResolver);
             httpService.setParams(params);
 
-            Socket socket = null;
+            Socket rawSocket = null;
             while (mRunning) {
                 try {
                     if (mIsDebugBuild) {
                         LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
                     }
-                    socket = mServerSocket.accept();
+                    rawSocket = mServerSocket.accept();
                     if (mIsDebugBuild) {
-                        LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
+                        LOGGER.info("accepting connection from: {}", rawSocket.getRemoteSocketAddress());
+                    }
+                    Socket boundSocket = rawSocket;
+
+                    // If SSL is enabled, ensure we have a SSLSocket and complete the handshake
+                    if (sslEnabled && (mServerSocket instanceof SSLServerSocket)) {
+                        SSLSocket sslSocket = (SSLSocket) rawSocket;
+                        sslSocket.setUseClientMode(false);
+                        String[] protocols = sslSocket.getEnabledProtocols();
+                        String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
+                        sslSocket.setEnabledProtocols(
+                                Arrays.stream(desired).filter(p -> Arrays.asList(protocols).contains(p))
+                                      .toArray(String[]::new)
+                        );
+                        sslSocket.startHandshake();
                     }
 
                     DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
-                    connection.bind(socket, new BasicHttpParams());
-                    RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
+                    connection.bind(boundSocket, new BasicHttpParams());
+                    RemoteConnection remoteConnection = new RemoteConnection(boundSocket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
                 } catch (SocketTimeoutException e) {
@@ -168,13 +237,16 @@ public class Server {
                     LOGGER.info("SocketListener shutting down");
                     mRunning = false;
                 } catch (IOException e) {
-                    LOGGER.error("", e);
+                    LOGGER.error("I/O error in accept loop", e);
+                    mRunning = false;
+                } catch (ClassCastException e) {
+                    LOGGER.error("Expected SSLSocket when SSL is enabled; check server socket setup", e);
                     mRunning = false;
                 }
             }
-            if (socket != null) {
+            if (rawSocket != null) {
                 try {
-                    socket.close();
+                    rawSocket.close();
                     LOGGER.info("Connection is closed properly");
                 } catch (IOException e) {
                     LOGGER.error("Can't close connection. Reason: ", e);
