@@ -58,18 +58,18 @@ public class Server {
     private boolean mSslEnabled = false;
 
     public void setSslContext(String keystorePath) throws Exception {
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        try (FileInputStream fis = new FileInputStream(keystorePath)) {
-            keyStore.load(fis, SslCertificateUtil.getCertificatePassword());
-        }
-
-        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(keyStore, SslCertificateUtil.getCertificatePassword());
-
-        mSslContext = SSLContext.getInstance("TLS");
-        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(SslCertificateUtil.getCaCertificate())};
-        mSslContext.init(kmf.getKeyManagers(), trustManagers, null);
-        mSslEnabled = true;
+//        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+//        try (FileInputStream fis = new FileInputStream(keystorePath)) {
+//            keyStore.load(fis, SslCertificateUtil.getCertificatePassword());
+//        }
+//
+//        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+//        kmf.init(keyStore, SslCertificateUtil.getCertificatePassword());
+//
+//        mSslContext = SSLContext.getInstance("TLS");
+//        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(SslCertificateUtil.getCaCertificate())};
+//        mSslContext.init(kmf.getKeyManagers(), trustManagers, null);
+//        mSslEnabled = true;
     }
 
     public void start() throws IOException {
