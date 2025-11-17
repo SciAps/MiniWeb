@@ -36,7 +36,7 @@ public class SslCertificateUtil {
             return getProperty("user.home") + separator + "sciaps" + separator + "client.p12";
         } else {
             LOGGER.error("Unsupported OS: {}", osName);
-            return null;
+            return "";
         }
     }
 
