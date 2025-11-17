@@ -106,27 +106,6 @@ public class Server {
         }
     }
 
-    private synchronized void fallbackToHttp() {
-        try {
-            if (mServerSocket != null && !mServerSocket.isClosed()) {
-                mServerSocket.close();
-            }
-        } catch (IOException e) {
-            LOGGER.error("Error closing SSL server socket during fallback", e);
-        }
-        mSslEnabled = false;
-        try {
-            ServerSocket plain = new ServerSocket(); // unbound
-            plain.setReuseAddress(true);
-            plain.bind(new InetSocketAddress(port));
-            mServerSocket = plain;
-            LOGGER.info("Reverted to plain HTTP on port {}", port);
-        } catch (IOException e) {
-            LOGGER.error("Failed to create plain HTTP ServerSocket after SSL fallback", e);
-            mRunning = false;
-        }
-    }
-
     private class WorkerTask implements Runnable {
 
         private final HttpService httpservice;
@@ -197,40 +176,29 @@ public class Server {
             httpService.setHandlerResolver(requestHandlerResolver);
             httpService.setParams(params);
 
-            Socket rawSocket = null;
+            Socket socket = null;
             while (mRunning) {
                 try {
                     if (mIsDebugBuild) {
                         LOGGER.info("waiting in accept on {}", mServerSocket.getLocalSocketAddress());
                     }
-                    rawSocket = mServerSocket.accept();
+                    socket = mServerSocket.accept();
                     if (mIsDebugBuild) {
-                        LOGGER.info("accepting connection from: {}", rawSocket.getRemoteSocketAddress());
+                        LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
                     }
-                    Socket boundSocket = rawSocket;
-
                     // If SSL is enabled, ensure we have a SSLSocket and complete the handshake
                     if (mSslEnabled && (mServerSocket instanceof SSLServerSocket)) {
-                        SSLSocket sslSocket = (SSLSocket) rawSocket;
+                        SSLSocket sslSocket = (SSLSocket) socket;
                         sslSocket.setUseClientMode(false);
                         sslSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
                         sslSocket.startHandshake();
                     }
 
                     DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
-                    connection.bind(boundSocket, new BasicHttpParams());
-                    RemoteConnection remoteConnection = new RemoteConnection(boundSocket.getInetAddress(), connection);
+                    connection.bind(socket, new BasicHttpParams());
+                    RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-                } catch (SSLHandshakeException e) {
-                    LOGGER.error("SSL Handshake failed: {}. Reverting to HTTP.", e.getMessage());
-                    try {
-                        rawSocket.close();
-                        LOGGER.info("Connection is closed properly");
-                    } catch (IOException ioException) {
-                        LOGGER.error("Can't close connection. Reason: ", ioException);
-                    }
-                    fallbackToHttp();
                 } catch (SocketTimeoutException e) {
                     continue;
                 } catch (SocketException e) {
@@ -244,9 +212,9 @@ public class Server {
                     mRunning = false;
                 }
             }
-            if (rawSocket != null) {
+            if (socket != null) {
                 try {
-                    rawSocket.close();
+                    socket.close();
                     LOGGER.info("Connection is closed properly");
                 } catch (IOException e) {
                     LOGGER.error("Can't close connection. Reason: ", e);
