@@ -28,13 +28,12 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.security.KeyStore;
-import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.net.ServerSocketFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -55,8 +54,8 @@ public class Server {
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
     private boolean mRunning = false;
-    private SSLContext sslContext;
-    private boolean sslEnabled = false;
+    private SSLContext mSslContext;
+    private boolean mSslEnabled = false;
 
     public void setSslContext(String keystorePath) throws Exception {
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
@@ -67,10 +66,10 @@ public class Server {
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(keyStore, SslCertificateUtil.getCertificatePassword());
 
-        sslContext = SSLContext.getInstance("TLS");
+        mSslContext = SSLContext.getInstance("TLS");
         TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(SslCertificateUtil.getCaCertificate())};
-        sslContext.init(kmf.getKeyManagers(), trustManagers, null);
-        sslEnabled = true;
+        mSslContext.init(kmf.getKeyManagers(), trustManagers, null);
+        mSslEnabled = true;
     }
 
     public void start() throws IOException {
@@ -79,8 +78,8 @@ public class Server {
             return;
         }
 
-        if (sslEnabled && sslContext != null) {
-            SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+        if (mSslEnabled && mSslContext != null) {
+            SSLServerSocketFactory factory = mSslContext.getServerSocketFactory();
             mServerSocket = factory.createServerSocket();
             ((SSLServerSocket) mServerSocket).setNeedClientAuth(true);
         } else {
@@ -100,6 +99,27 @@ public class Server {
         mListenThread.start();
     }
 
+    private synchronized void fallbackToHttp() {
+        try {
+            if (mServerSocket != null && !mServerSocket.isClosed()) {
+                mServerSocket.close();
+            }
+        } catch (IOException e) {
+            LOGGER.error("Error closing SSL server socket during fallback", e);
+        }
+        mSslEnabled = false;
+        try {
+            ServerSocket plain = new ServerSocket(); // unbound
+            plain.setReuseAddress(true);
+            plain.bind(new InetSocketAddress(port));
+            mServerSocket = plain;
+            LOGGER.info("Reverted to plain HTTP on port {}", port);
+        } catch (IOException e) {
+            LOGGER.error("Failed to create plain HTTP ServerSocket after SSL fallback", e);
+            mRunning = false;
+        }
+    }
+
     public void shutdown() {
         if (!mRunning) {
             return;
@@ -115,7 +135,6 @@ public class Server {
             mListenThread = null;
         } catch (InterruptedException e) {
             LOGGER.error("Interrupted waiting for listener thread to join", e);
-            Thread.currentThread().interrupt();
         }
         LOGGER.info("Server shutdown");
     }
@@ -213,15 +232,10 @@ public class Server {
                     Socket boundSocket = rawSocket;
 
                     // If SSL is enabled, ensure we have a SSLSocket and complete the handshake
-                    if (sslEnabled && (mServerSocket instanceof SSLServerSocket)) {
+                    if (mSslEnabled && (mServerSocket instanceof SSLServerSocket)) {
                         SSLSocket sslSocket = (SSLSocket) rawSocket;
                         sslSocket.setUseClientMode(false);
-                        String[] protocols = sslSocket.getEnabledProtocols();
-                        String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
-                        sslSocket.setEnabledProtocols(
-                                Arrays.stream(desired).filter(p -> Arrays.asList(protocols).contains(p))
-                                      .toArray(String[]::new)
-                        );
+                        sslSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
                         sslSocket.startHandshake();
                     }
 
@@ -230,6 +244,15 @@ public class Server {
                     RemoteConnection remoteConnection = new RemoteConnection(boundSocket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
+                } catch (SSLHandshakeException e) {
+                    LOGGER.error("SSL Handshake failed: {}. Reverting to HTTP.", e.getMessage());
+                    try {
+                        rawSocket.close();
+                        LOGGER.info("Connection is closed properly");
+                    } catch (IOException ioException) {
+                        LOGGER.error("Can't close connection. Reason: ", ioException);
+                    }
+                    fallbackToHttp();
                 } catch (SocketTimeoutException e) {
                     continue;
                 } catch (SocketException e) {
