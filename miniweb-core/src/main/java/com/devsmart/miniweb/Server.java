@@ -99,6 +99,24 @@ public class Server {
         mListenThread.start();
     }
 
+    public void shutdown() {
+        if (mRunning) {
+            mRunning = false;
+            try {
+                mServerSocket.close();
+            } catch (IOException e) {
+                LOGGER.error("Could not close socket:", e);
+            }
+            try {
+                mListenThread.join();
+                mListenThread = null;
+            } catch (InterruptedException e) {
+                LOGGER.error("", e);
+            }
+            LOGGER.info("Server shutdown");
+        }
+    }
+
     private synchronized void fallbackToHttp() {
         try {
             if (mServerSocket != null && !mServerSocket.isClosed()) {
@@ -117,35 +135,6 @@ public class Server {
         } catch (IOException e) {
             LOGGER.error("Failed to create plain HTTP ServerSocket after SSL fallback", e);
             mRunning = false;
-        }
-    }
-
-    public void shutdown() {
-        if (!mRunning) {
-            return;
-        }
-        mRunning = false;
-        try {
-            mServerSocket.close();
-        } catch (IOException e) {
-            LOGGER.error("Could not close socket:", e);
-        }
-        try {
-            mListenThread.join();
-            mListenThread = null;
-        } catch (InterruptedException e) {
-            LOGGER.error("Interrupted waiting for listener thread to join", e);
-        }
-        LOGGER.info("Server shutdown");
-    }
-
-    private static final class RemoteConnection {
-        final java.net.InetAddress remoteAddress;
-        final DefaultHttpServerConnection connection;
-
-        RemoteConnection(java.net.InetAddress addr, DefaultHttpServerConnection conn) {
-            this.remoteAddress = addr;
-            this.connection = conn;
         }
     }
 
