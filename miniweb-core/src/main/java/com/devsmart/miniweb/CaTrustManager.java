@@ -68,7 +68,7 @@ public class CaTrustManager implements X509TrustManager {
             LOGGER.error("Root not signed by trusted CA: {}", e.getMessage());
         }
 
-        // Optional: ensure CA is self-signed (basic check)
+        // Ensure CA is self-signed (basic check)
         try {
             trustedCA.verify(trustedCA.getPublicKey());
         } catch (Exception e) {
