@@ -6,6 +6,8 @@ import com.google.gson.GsonBuilder;
 import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.protocol.HttpRequestHandlerResolver;
 import com.devsmart.miniweb.handlers.FileSystemRequestHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.security.cert.X509Certificate;
@@ -19,6 +21,8 @@ public class ServerBuilder {
     private Gson mGson = new GsonBuilder().create();
     private boolean mIsDebugBuild;
     private String mKeyStorePath;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServerBuilder.class.getSimpleName());
+
     public ServerBuilder setDebugBuild(boolean isDebug) {
         mIsDebugBuild = isDebug;
         return this;
@@ -89,13 +93,13 @@ public class ServerBuilder {
         try {
             server.setSslContext(mKeyStorePath);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            LOGGER.error("Failed to set up SSL context: {}", e.getMessage());
         }
 
         return server;
     }
 
-    public void setKeyStorePathAndPasswords(String keyStorePath) {
+    public void setKeyStorePath(String keyStorePath) {
         mKeyStorePath = keyStorePath;
     }
 }

@@ -61,14 +61,14 @@ public class Server {
     public void setSslContext(String keystorePath) throws Exception {
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
         try (FileInputStream fis = new FileInputStream(keystorePath)) {
-            keyStore.load(fis, CaCertificateLoader.getCertificatePassword());
+            keyStore.load(fis, SslCertificateUtil.getCertificatePassword());
         }
 
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(keyStore, CaCertificateLoader.getCertificatePassword());
+        kmf.init(keyStore, SslCertificateUtil.getCertificatePassword());
 
         sslContext = SSLContext.getInstance("TLS");
-        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(CaCertificateLoader.getCaCertificate())};
+        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(SslCertificateUtil.getCaCertificate())};
         sslContext.init(kmf.getKeyManagers(), trustManagers, null);
         sslEnabled = true;
     }
@@ -84,8 +84,7 @@ public class Server {
             mServerSocket = factory.createServerSocket();
             ((SSLServerSocket) mServerSocket).setNeedClientAuth(true);
         } else {
-            ServerSocketFactory factory = ServerSocketFactory.getDefault();
-            mServerSocket = factory.createServerSocket();
+            mServerSocket = new ServerSocket(port);
         }
 
         mServerSocket.setReuseAddress(true);

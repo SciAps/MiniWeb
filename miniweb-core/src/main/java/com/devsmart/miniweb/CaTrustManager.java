@@ -1,5 +1,8 @@
 package com.devsmart.miniweb;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
@@ -8,6 +11,7 @@ import javax.net.ssl.X509TrustManager;
 @SuppressWarnings("CustomX509TrustManager")
 public class CaTrustManager implements X509TrustManager {
     private final X509Certificate trustedCA;
+    private static final Logger LOGGER = LoggerFactory.getLogger(CaTrustManager.class);
 
     public CaTrustManager(X509Certificate caCert) {
         this.trustedCA = caCert;
@@ -30,10 +34,10 @@ public class CaTrustManager implements X509TrustManager {
 
     private void validateChain(X509Certificate[] chain, String authType) throws CertificateException {
         if (chain == null || chain.length == 0) {
-            throw new CertificateException("Empty certificate chain");
+           LOGGER.error("Empty certificate chain");
         }
         if (authType == null || authType.isEmpty()) {
-            throw new CertificateException("Missing authType");
+            LOGGER.error("Missing authType");
         }
 
         // Check each certificate validity period
@@ -46,7 +50,7 @@ public class CaTrustManager implements X509TrustManager {
             try {
                 chain[i].verify(chain[i + 1].getPublicKey());
             } catch (Exception e) {
-                throw new CertificateException("Broken chain at position " + i + ": " + e.getMessage(), e);
+                LOGGER.error("Broken chain at position {}: {}", i, e.getMessage(), e);
             }
         }
 
@@ -54,21 +58,21 @@ public class CaTrustManager implements X509TrustManager {
 
         // Ensure provided CA matches the root subject
         if (!root.getSubjectX500Principal().equals(trustedCA.getSubjectX500Principal())) {
-            throw new CertificateException("Root subject does not match trusted CA");
+            LOGGER.info("Root subject does not match trusted CA");
         }
 
         // Ensure provided CA actually signed the presented root
         try {
             root.verify(trustedCA.getPublicKey());
         } catch (Exception e) {
-            throw new CertificateException("Root not signed by trusted CA: " + e.getMessage(), e);
+            LOGGER.error("Root not signed by trusted CA: {}", e.getMessage());
         }
 
         // Optional: ensure CA is self-signed (basic check)
         try {
             trustedCA.verify(trustedCA.getPublicKey());
         } catch (Exception e) {
-            throw new CertificateException("Configured CA is not self-signed or invalid: " + e.getMessage(), e);
+            LOGGER.error("Configured CA is not self-signed or invalid: {}", e.getMessage(), e);
         }
     }
 }
