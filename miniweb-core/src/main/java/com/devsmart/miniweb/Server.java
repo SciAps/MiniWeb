@@ -20,18 +20,16 @@ import org.apache.http.protocol.ResponseServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.security.KeyStore;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLServerSocket;
@@ -57,19 +55,10 @@ public class Server {
     private SSLContext mSslContext;
     private boolean mSslEnabled = false;
 
-    public void setSslContext(String keystorePath) throws Exception {
-//        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-//        try (FileInputStream fis = new FileInputStream(keystorePath)) {
-//            keyStore.load(fis, SslCertificateUtil.getCertificatePassword());
-//        }
-//
-//        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-//        kmf.init(keyStore, SslCertificateUtil.getCertificatePassword());
-//
-//        mSslContext = SSLContext.getInstance("TLS");
-//        TrustManager[] trustManagers = new TrustManager[]{new CaTrustManager(SslCertificateUtil.getCaCertificate())};
-//        mSslContext.init(kmf.getKeyManagers(), trustManagers, null);
-//        mSslEnabled = true;
+    public void configureSslContext(KeyManager[] keyManagers, TrustManager[] trustManagers) throws Exception {
+        mSslContext = SSLContext.getInstance("TLS");
+        mSslContext.init(keyManagers, trustManagers, null);
+        mSslEnabled = true;
     }
 
     public void start() throws IOException {

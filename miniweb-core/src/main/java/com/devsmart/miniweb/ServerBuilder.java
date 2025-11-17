@@ -10,7 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.security.cert.X509Certificate;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
 
 public class ServerBuilder {
 
@@ -20,7 +22,8 @@ public class ServerBuilder {
     private UriRequestHandlerResolver mUriMapper = new UriRequestHandlerResolver();
     private Gson mGson = new GsonBuilder().create();
     private boolean mIsDebugBuild;
-    private String mKeyStorePath;
+    private KeyManager[] mKeyManagers;
+    private TrustManager[] mTrustManagers;
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerBuilder.class.getSimpleName());
 
     public ServerBuilder setDebugBuild(boolean isDebug) {
@@ -90,16 +93,18 @@ public class ServerBuilder {
             mRequestHandler = mUriMapper;
         }
         server.requestHandlerResolver = mRequestHandler;
-        try {
-            server.setSslContext(mKeyStorePath);
-        } catch (Exception e) {
-            LOGGER.error("Failed to set up SSL context: {}", e.getMessage());
+        if (mKeyManagers != null && mTrustManagers != null) {
+            try {
+                server.configureSslContext(mKeyManagers, mTrustManagers);
+            } catch (Exception e) {
+                LOGGER.error("Failed to set up SSL context: {}", e.getMessage());
+            }
         }
-
         return server;
     }
 
-    public void setKeyStorePath(String keyStorePath) {
-        mKeyStorePath = keyStorePath;
+    public void setSslConfigs(KeyManager[] keyManagers, TrustManager[] trustManagers) {
+        mKeyManagers = keyManagers;
+        mTrustManagers = trustManagers;
     }
 }
