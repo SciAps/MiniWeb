@@ -55,10 +55,16 @@ public class Server {
     private SSLContext mSslContext;
     private boolean mSslEnabled = false;
 
-    public void configureSslContext(KeyManager[] keyManagers, TrustManager[] trustManagers) throws Exception {
-        mSslContext = SSLContext.getInstance("TLS");
-        mSslContext.init(keyManagers, trustManagers, null);
-        mSslEnabled = true;
+    public void configureSslContext(KeyManager[] keyManagers, TrustManager[] trustManagers)  {
+        try {
+            mSslContext = SSLContext.getInstance("TLS");
+            mSslContext.init(keyManagers, trustManagers, null);
+            mSslEnabled = true;
+        } catch (Exception e) {
+            LOGGER.error("Could not initialize SSLContext:", e);
+            mSslContext = null;
+            mSslEnabled = false;
+        }
     }
 
     public void start() throws IOException {

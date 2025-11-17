@@ -94,11 +94,7 @@ public class ServerBuilder {
         }
         server.requestHandlerResolver = mRequestHandler;
         if (mKeyManagers != null && mTrustManagers != null) {
-            try {
-                server.configureSslContext(mKeyManagers, mTrustManagers);
-            } catch (Exception e) {
-                LOGGER.error("Failed to set up SSL context: {}", e.getMessage());
-            }
+            server.configureSslContext(mKeyManagers, mTrustManagers);
         }
         return server;
     }
