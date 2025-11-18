@@ -29,6 +29,7 @@ import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.net.ServerSocketFactory;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
@@ -78,7 +79,8 @@ public class Server {
             mServerSocket = factory.createServerSocket();
             ((SSLServerSocket) mServerSocket).setNeedClientAuth(true);
         } else {
-            mServerSocket = new ServerSocket(port);
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
+            mServerSocket = factory.createServerSocket();
         }
 
         mServerSocket.setReuseAddress(true);
@@ -104,9 +106,11 @@ public class Server {
             }
             try {
                 mListenThread.join();
-                mListenThread = null;
             } catch (InterruptedException e) {
-                LOGGER.error("", e);
+                LOGGER.error("Interrupted waiting for listener thread shutdown", e);
+                Thread.currentThread().interrupt();
+            } finally {
+                mListenThread = null;
             }
             LOGGER.info("Server shutdown");
         }
@@ -146,22 +150,16 @@ public class Server {
             } finally {
                 LOGGER.info("Closing connection {}", remoteConnection.connection);
                 try {
-                    // Try a graceful shutdown first
-                    try {
-                        remoteConnection.connection.shutdown();
-                    } catch (UnsupportedOperationException uoe) {
-                        // SSLSocket may not support half-close; ignore
-                    }
-                } catch (IOException ignore) {}
+                    remoteConnection.connection.shutdown();
+                } catch (UnsupportedOperationException | IOException e) {
+                    LOGGER.error("Error shutting down connection", e);
+                }
                 try {
                     remoteConnection.connection.close();
-                } catch (UnsupportedOperationException uoe) {
-                    // Ignore half-close attempts on SSLSocket
-                } catch (IOException e) {
+                } catch (UnsupportedOperationException | IOException e) {
                     LOGGER.error("Error closing connection", e);
                 }
             }
-
         }
     }
 
@@ -205,7 +203,7 @@ public class Server {
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-                } catch (SocketTimeoutException e) {
+                } catch (SocketTimeoutException | SSLHandshakeException e) {
                     continue;
                 } catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
