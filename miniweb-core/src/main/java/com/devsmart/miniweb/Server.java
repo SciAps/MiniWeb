@@ -26,6 +26,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -194,7 +195,11 @@ public class Server {
                     if (mSslEnabled && (mServerSocket instanceof SSLServerSocket)) {
                         SSLSocket sslSocket = (SSLSocket) socket;
                         sslSocket.setUseClientMode(false);
-                        sslSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
+                        String[] protocols = sslSocket.getEnabledProtocols();
+                        String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
+                        sslSocket.setEnabledProtocols(
+                                Arrays.stream(desired).filter(p -> Arrays.asList(protocols).contains(p))
+                                      .toArray(String[]::new));
                         sslSocket.startHandshake();
                     }
 
