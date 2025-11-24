@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -208,26 +208,33 @@ public class Server {
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-                } catch (SocketTimeoutException | SSLHandshakeException e) {
+                } catch (SocketTimeoutException e) {
                     continue;
-                } catch (SocketException e) {
+                } catch (SSLException e) {
+                    closeSocket(socket);
+                }
+                catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
                     mRunning = false;
                 } catch (IOException e) {
-                    LOGGER.error("I/O error in accept loop", e);
+                    LOGGER.error("I/O error", e);
                     mRunning = false;
                 } catch (ClassCastException e) {
                     LOGGER.error("Expected SSLSocket when SSL is enabled; check server socket setup", e);
                     mRunning = false;
                 }
             }
-            if (socket != null) {
-                try {
-                    socket.close();
-                    LOGGER.info("Connection is closed properly");
-                } catch (IOException e) {
-                    LOGGER.error("Can't close connection. Reason: ", e);
-                }
+            closeSocket(socket);
+        }
+    }
+
+    private static void closeSocket(Socket socket) {
+        if (socket != null) {
+            try {
+                socket.close();
+                LOGGER.info("Connection is closed properly");
+            } catch (IOException e) {
+                LOGGER.error("Can't close connection. Reason: ", e);
             }
         }
     }
