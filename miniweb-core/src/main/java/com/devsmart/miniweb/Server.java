@@ -151,12 +151,9 @@ public class Server {
             } finally {
                 LOGGER.info("Closing connection {}", remoteConnection.connection);
                 try {
-                    remoteConnection.connection.shutdown();
-                } catch (UnsupportedOperationException | IOException e) {
-                    LOGGER.error("Error shutting down connection", e);
-                }
-                try {
-                    remoteConnection.connection.close();
+                    if (remoteConnection.connection.isOpen()) {
+                        remoteConnection.connection.close();
+                    }
                 } catch (UnsupportedOperationException | IOException e) {
                     LOGGER.error("Error closing connection", e);
                 }
@@ -203,7 +200,7 @@ public class Server {
                         sslSocket.startHandshake();
                     }
 
-                    DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
+                    SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
                     connection.bind(socket, new BasicHttpParams());
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
@@ -235,6 +232,23 @@ public class Server {
                 LOGGER.info("Connection is closed properly");
             } catch (IOException e) {
                 LOGGER.error("Can't close connection. Reason: ", e);
+            }
+        }
+    }
+
+
+    public static class SSLSafeHttpServerConnection extends DefaultHttpServerConnection {
+        @Override
+        public void close() throws IOException {
+            try {
+                // This attempts to call shutdownOutput(), which fails on Android SSL
+                super.close();
+            } catch (UnsupportedOperationException e) {
+                // Catch the specific Android error
+                // verify the socket exists and force-close it to prevent leaks
+                if (getSocket() != null) {
+                    getSocket().close();
+                }
             }
         }
     }
