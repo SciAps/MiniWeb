@@ -24,7 +24,6 @@ public class ServerBuilder {
     private boolean mIsDebugBuild;
     private KeyManager[] mKeyManagers;
     private TrustManager[] mTrustManagers;
-    private static final Logger LOGGER = LoggerFactory.getLogger(ServerBuilder.class.getSimpleName());
 
     public ServerBuilder setDebugBuild(boolean isDebug) {
         mIsDebugBuild = isDebug;
