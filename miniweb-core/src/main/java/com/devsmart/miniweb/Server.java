@@ -3,6 +3,12 @@ package com.devsmart.miniweb;
 import org.apache.http.ConnectionClosedException;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpServerConnection;
+import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
+import org.apache.http.MethodNotSupportedException;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.DefaultHttpResponseFactory;
 import org.apache.http.impl.DefaultHttpServerConnection;
@@ -10,6 +16,7 @@ import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.BasicHttpProcessor;
+import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.protocol.HttpRequestHandlerResolver;
 import org.apache.http.protocol.HttpService;
@@ -26,6 +33,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -78,7 +86,6 @@ public class Server {
         if (mSslEnabled && mSslContext != null) {
             SSLServerSocketFactory factory = mSslContext.getServerSocketFactory();
             mServerSocket = factory.createServerSocket();
-            ((SSLServerSocket) mServerSocket).setNeedClientAuth(true);
         } else {
             ServerSocketFactory factory = ServerSocketFactory.getDefault();
             mServerSocket = factory.createServerSocket();
@@ -206,11 +213,10 @@ public class Server {
 
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
                 } catch (SocketTimeoutException e) {
-                    continue;
+                    // ignore and continue
                 } catch (SSLException e) {
                     closeSocket(socket);
-                }
-                catch (SocketException e) {
+                } catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
                     mRunning = false;
                 } catch (IOException e) {
