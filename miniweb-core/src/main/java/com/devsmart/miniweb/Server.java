@@ -3,12 +3,6 @@ package com.devsmart.miniweb;
 import org.apache.http.ConnectionClosedException;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpServerConnection;
-import org.apache.http.HttpStatus;
-import org.apache.http.HttpVersion;
-import org.apache.http.MethodNotSupportedException;
-import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.DefaultHttpResponseFactory;
 import org.apache.http.impl.DefaultHttpServerConnection;
@@ -16,7 +10,6 @@ import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.protocol.BasicHttpProcessor;
-import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpCoreContext;
 import org.apache.http.protocol.HttpRequestHandlerResolver;
 import org.apache.http.protocol.HttpService;
@@ -33,7 +26,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,7 +36,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
 public class Server {
@@ -93,6 +84,22 @@ public class Server {
 
         mServerSocket.setReuseAddress(true);
         mServerSocket.bind(new InetSocketAddress(port));
+
+        if (mSslEnabled && mServerSocket instanceof SSLServerSocket) {
+            SSLServerSocket sslServerSocket = (SSLServerSocket) mServerSocket;
+            sslServerSocket.setNeedClientAuth(true);
+            String[] supported = sslServerSocket.getSupportedProtocols();
+            String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
+            String[] filtered = Arrays.stream(desired)
+                                      .filter(p -> Arrays.asList(supported).contains(p))
+                                      .toArray(String[]::new);
+            if (filtered.length > 0) {
+                sslServerSocket.setEnabledProtocols(filtered);
+            }
+            LOGGER.info("SSL server socket configured: clientAuth=required, protocols={}",
+                        Arrays.toString(sslServerSocket.getEnabledProtocols()));
+        }
+
         if (mIsDebugBuild) {
             LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
         }
@@ -195,18 +202,6 @@ public class Server {
                     if (mIsDebugBuild) {
                         LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
                     }
-                    // If SSL is enabled, ensure we have a SSLSocket and complete the handshake
-                    if (mSslEnabled && (mServerSocket instanceof SSLServerSocket)) {
-                        SSLSocket sslSocket = (SSLSocket) socket;
-                        sslSocket.setUseClientMode(false);
-                        String[] protocols = sslSocket.getEnabledProtocols();
-                        String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
-                        sslSocket.setEnabledProtocols(
-                                Arrays.stream(desired).filter(p -> Arrays.asList(protocols).contains(p))
-                                      .toArray(String[]::new));
-                        sslSocket.startHandshake();
-                    }
-
                     SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
                     connection.bind(socket, new BasicHttpParams());
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
