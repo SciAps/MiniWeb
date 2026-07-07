@@ -62,9 +62,9 @@ public class Server {
             mSslContext.init(keyManagers, trustManagers, null);
             mSslEnabled = true;
         } catch (Exception e) {
-            LOGGER.error("Could not initialize SSLContext:", e);
             mSslContext = null;
             mSslEnabled = false;
+            throw new IllegalStateException("Could not initialize SSLContext", e);
         }
     }
 
