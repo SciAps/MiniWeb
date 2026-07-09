@@ -210,6 +210,8 @@ public class Server {
                 } catch (SocketTimeoutException e) {
                     // ignore and continue
                 } catch (SSLException e) {
+                    LOGGER.warn("TLS handshake failed from {}: {}",
+                                socket != null ? socket.getRemoteSocketAddress() : "unknown", e.getMessage());
                     closeSocket(socket);
                 } catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
