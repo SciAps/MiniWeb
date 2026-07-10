@@ -7,11 +7,11 @@ compileJava {
 }
 
 dependencies {
-    implementation 'org.apache.httpcomponents:httpcore:4.3'
+    implementation "$dependency.httpCore"
     implementation 'com.google.code.gson:gson:2.13.1'
     implementation 'org.slf4j:slf4j-api:1.7.32'
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.slf4j:slf4j-api:1.7.32'
-    testImplementation 'org.apache.httpcomponents:httpclient:4.3'
+    testImplementation "$dependency.httpClient"
 }
