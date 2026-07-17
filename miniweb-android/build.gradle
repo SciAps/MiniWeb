@@ -22,7 +22,7 @@ android {
 
 dependencies {
     implementation project(':libraries:MiniWeb:miniweb-core')
-    implementation 'org.apache.httpcomponents:httpcore:4.3'
+    implementation "$dependency.httpCore"
     implementation "$dependency.gson"
     implementation "$dependency.slf4jApi"
 }

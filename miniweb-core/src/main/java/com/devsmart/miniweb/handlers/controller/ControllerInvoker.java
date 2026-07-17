@@ -1,20 +1,18 @@
 package com.devsmart.miniweb.handlers.controller;
 
 
+import com.devsmart.miniweb.utils.RequestMethod;
 import com.google.gson.Gson;
+import com.google.gson.stream.JsonWriter;
 
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.entity.BasicHttpEntity;
-import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpRequestHandler;
-import com.devsmart.miniweb.utils.RequestMethod;
-import com.google.gson.stream.JsonWriter;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
