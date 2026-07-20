@@ -27,6 +27,9 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -52,7 +55,8 @@ public class Server {
 
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
-    private boolean mRunning = false;
+    private final Set<RemoteConnection> mActiveConnections = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private volatile boolean mRunning = false;
     private SSLContext mSslContext;
     private boolean mSslEnabled = false;
 
@@ -119,6 +123,16 @@ public class Server {
             } catch (IOException e) {
                 LOGGER.error("Could not close socket:", e);
             }
+            // Force-close accepted connections: keep-alive clients hold sockets open with a
+            // worker thread blocked in handleRequest(), and would otherwise get one more
+            // response served with this server's stale routes after shutdown.
+            for (RemoteConnection remoteConnection : mActiveConnections) {
+                try {
+                    remoteConnection.connection.shutdown();
+                } catch (IOException e) {
+                    LOGGER.warn("Error shutting down connection {}: {}", remoteConnection.connection, e.getMessage());
+                }
+            }
             try {
                 mListenThread.join();
             } catch (InterruptedException e) {
@@ -163,6 +177,7 @@ public class Server {
             } catch (Exception e){
                 LOGGER.warn("unknown error - {}", remoteConnection.connection, e);
             } finally {
+                mActiveConnections.remove(remoteConnection);
                 LOGGER.info("Closing connection {}", remoteConnection.connection);
                 try {
                     if (remoteConnection.connection.isOpen()) {
@@ -206,6 +221,7 @@ public class Server {
                     connection.bind(socket, new BasicHttpParams());
                     RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
 
+                    mActiveConnections.add(remoteConnection);
                     mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
                 } catch (SocketTimeoutException e) {
                     // ignore and continue
