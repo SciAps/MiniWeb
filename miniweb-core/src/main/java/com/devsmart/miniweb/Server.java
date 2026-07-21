@@ -256,17 +256,32 @@ public class Server {
     }
 
 
+    // HttpCore's DefaultHttpServerConnection.close() calls Socket.shutdownOutput(), which Android's SSL
+    // socket implementation does not support and other layers may have already closed. This subclass
+    // makes close() tolerant of both so a normal teardown never surfaces as a spurious error.
     public static class SSLSafeHttpServerConnection extends DefaultHttpServerConnection {
         @Override
         public void close() throws IOException {
+            // Already closed (e.g. force-closed by shutdown()): nothing to do, and re-closing would only
+            // risk another shutdownOutput() failure.
+            Socket socket = getSocket();
+            if (socket != null && socket.isClosed()) {
+                return;
+            }
             try {
-                // This attempts to call shutdownOutput(), which fails on Android SSL
                 super.close();
             } catch (UnsupportedOperationException e) {
                 // Catch the specific Android error
                 // verify the socket exists and force-close it to prevent leaks
                 if (getSocket() != null) {
                     getSocket().close();
+                }
+            } catch (IOException e) {
+                // The socket was closed concurrently (e.g. during shutdown) so the buffered flush in
+                // super.close() failed; release the socket without escalating this to an error.
+                Socket current = getSocket();
+                if (current != null && !current.isClosed()) {
+                    current.close();
                 }
             }
         }
