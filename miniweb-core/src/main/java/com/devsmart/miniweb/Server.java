@@ -24,10 +24,22 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import javax.net.ServerSocketFactory;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.TrustManager;
 
 public class Server {
 
@@ -43,7 +55,22 @@ public class Server {
 
     private ServerSocket mServerSocket;
     private SocketListener mListenThread;
-    private boolean mRunning = false;
+    private final Set<RemoteConnection> mActiveConnections = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private volatile boolean mRunning = false;
+    private SSLContext mSslContext;
+    private boolean mSslEnabled = false;
+
+    public void configureSslContext(KeyManager[] keyManagers, TrustManager[] trustManagers)  {
+        try {
+            mSslContext = SSLContext.getInstance("TLS");
+            mSslContext.init(keyManagers, trustManagers, null);
+            mSslEnabled = true;
+        } catch (Exception e) {
+            mSslContext = null;
+            mSslEnabled = false;
+            throw new IllegalStateException("Could not initialize SSLContext", e);
+        }
+    }
 
     public void start() throws IOException {
         if (mRunning) {
@@ -51,9 +78,32 @@ public class Server {
             return;
         }
 
-        mServerSocket = new ServerSocket();
+        if (mSslEnabled && mSslContext != null) {
+            SSLServerSocketFactory factory = mSslContext.getServerSocketFactory();
+            mServerSocket = factory.createServerSocket();
+        } else {
+            ServerSocketFactory factory = ServerSocketFactory.getDefault();
+            mServerSocket = factory.createServerSocket();
+        }
+
         mServerSocket.setReuseAddress(true);
         mServerSocket.bind(new InetSocketAddress(port));
+
+        if (mSslEnabled && mServerSocket instanceof SSLServerSocket) {
+            SSLServerSocket sslServerSocket = (SSLServerSocket) mServerSocket;
+            sslServerSocket.setNeedClientAuth(true);
+            String[] supported = sslServerSocket.getSupportedProtocols();
+            String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
+            String[] filtered = Arrays.stream(desired)
+                                      .filter(p -> Arrays.asList(supported).contains(p))
+                                      .toArray(String[]::new);
+            if (filtered.length > 0) {
+                sslServerSocket.setEnabledProtocols(filtered);
+            }
+            LOGGER.info("SSL server socket configured: clientAuth=required, protocols={}",
+                        Arrays.toString(sslServerSocket.getEnabledProtocols()));
+        }
+
         if (mIsDebugBuild) {
             LOGGER.info("Server started listening on {}", mServerSocket.getLocalSocketAddress());
         }
@@ -73,11 +123,23 @@ public class Server {
             } catch (IOException e) {
                 LOGGER.error("Could not close socket:", e);
             }
+            // Force-close accepted connections: keep-alive clients hold sockets open with a
+            // worker thread blocked in handleRequest(), and would otherwise get one more
+            // response served with this server's stale routes after shutdown.
+            for (RemoteConnection remoteConnection : mActiveConnections) {
+                try {
+                    remoteConnection.connection.shutdown();
+                } catch (IOException e) {
+                    LOGGER.warn("Error shutting down connection {}: {}", remoteConnection.connection, e.getMessage());
+                }
+            }
             try {
                 mListenThread.join();
-                mListenThread = null;
             } catch (InterruptedException e) {
-                LOGGER.error("", e);
+                LOGGER.error("Interrupted waiting for listener thread shutdown", e);
+                Thread.currentThread().interrupt();
+            } finally {
+                mListenThread = null;
             }
             LOGGER.info("Server shutdown");
         }
@@ -86,15 +148,32 @@ public class Server {
     private class WorkerTask implements Runnable {
 
         private final HttpService httpservice;
-        private final RemoteConnection remoteConnection;
+        private final Socket socket;
 
-        public WorkerTask(HttpService service, RemoteConnection connection) {
+        WorkerTask(HttpService service, Socket socket) {
             httpservice = service;
-            remoteConnection = connection;
+            this.socket = socket;
         }
 
         @Override
         public void run() {
+            SocketAddress remoteAddress = socket.getRemoteSocketAddress();
+            SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
+            RemoteConnection remoteConnection;
+            try {
+                connection.bind(socket, new BasicHttpParams());
+                remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
+                mActiveConnections.add(remoteConnection);
+            } catch (SSLException e) {
+                LOGGER.warn("TLS handshake failed from {}: {}", remoteAddress, e.getMessage());
+                closeSocket(socket);
+                return;
+            } catch (Exception e) {
+                LOGGER.warn("Failed to establish connection from {}: {}", remoteAddress, e.getMessage());
+                closeSocket(socket);
+                return;
+            }
+
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
                     BasicHttpContext context = new BasicHttpContext();
@@ -115,16 +194,15 @@ public class Server {
             } catch (Exception e){
                 LOGGER.warn("unknown error - {}", remoteConnection.connection, e);
             } finally {
+                mActiveConnections.remove(remoteConnection);
                 LOGGER.info("Closing connection {}", remoteConnection.connection);
-                closeConnection();
-            }
-        }
-
-        public void closeConnection() {
-            try {
-                remoteConnection.connection.close();
-            } catch (IOException e){
-                LOGGER.error("", e);
+                try {
+                    if (remoteConnection.connection.isOpen()) {
+                        remoteConnection.connection.close();
+                    }
+                } catch (UnsupportedOperationException | IOException e) {
+                    LOGGER.error("Error closing connection", e);
+                }
             }
         }
     }
@@ -156,28 +234,58 @@ public class Server {
                     if (mIsDebugBuild) {
                         LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
                     }
-
-                    DefaultHttpServerConnection connection = new DefaultHttpServerConnection();
-                    connection.bind(socket, new BasicHttpParams());
-                    RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
-
-                    mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-                } catch (SocketTimeoutException e) {
-                    continue;
+                    mWorkerThreads.execute(new WorkerTask(httpService, socket));
+                    socket = null; // handed off to the worker; this loop must not close it
                 } catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
                     mRunning = false;
                 } catch (IOException e) {
-                    LOGGER.error("", e);
+                    LOGGER.error("I/O error", e);
                     mRunning = false;
                 }
             }
-            if (socket != null) {
-                try {
-                    socket.close();
-                    LOGGER.info("Connection is closed properly");
-                } catch (IOException e) {
-                    LOGGER.error("Can't close connection. Reason: ", e);
+            closeSocket(socket);
+        }
+    }
+
+    private static void closeSocket(Socket socket) {
+        if (socket != null) {
+            try {
+                socket.close();
+                LOGGER.info("Connection is closed properly");
+            } catch (IOException e) {
+                LOGGER.error("Can't close connection. Reason: ", e);
+            }
+        }
+    }
+
+
+    // HttpCore's DefaultHttpServerConnection.close() calls Socket.shutdownOutput(), which Android's SSL
+    // socket implementation does not support and other layers may have already closed. This subclass
+    // makes close() tolerant of both so a normal teardown never surfaces as a spurious error.
+    public static class SSLSafeHttpServerConnection extends DefaultHttpServerConnection {
+        @Override
+        public void close() throws IOException {
+            // Already closed (e.g. force-closed by shutdown()): nothing to do, and re-closing would only
+            // risk another shutdownOutput() failure.
+            Socket socket = getSocket();
+            if (socket != null && socket.isClosed()) {
+                return;
+            }
+            try {
+                super.close();
+            } catch (UnsupportedOperationException e) {
+                // Catch the specific Android error
+                // verify the socket exists and force-close it to prevent leaks
+                if (getSocket() != null) {
+                    getSocket().close();
+                }
+            } catch (IOException e) {
+                // The socket was closed concurrently (e.g. during shutdown) so the buffered flush in
+                // super.close() failed; release the socket without escalating this to an error.
+                Socket current = getSocket();
+                if (current != null && !current.isClosed()) {
+                    current.close();
                 }
             }
         }

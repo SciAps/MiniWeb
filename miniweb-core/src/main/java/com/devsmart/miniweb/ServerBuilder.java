@@ -1,15 +1,18 @@
 package com.devsmart.miniweb;
 
-
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.protocol.HttpRequestHandlerResolver;
 import com.devsmart.miniweb.handlers.FileSystemRequestHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.TrustManager;
 
 public class ServerBuilder {
 
@@ -19,6 +22,8 @@ public class ServerBuilder {
     private UriRequestHandlerResolver mUriMapper = new UriRequestHandlerResolver();
     private Gson mGson = new GsonBuilder().create();
     private boolean mIsDebugBuild;
+    private KeyManager[] mKeyManagers;
+    private TrustManager[] mTrustManagers;
 
     public ServerBuilder setDebugBuild(boolean isDebug) {
         mIsDebugBuild = isDebug;
@@ -87,7 +92,14 @@ public class ServerBuilder {
             mRequestHandler = mUriMapper;
         }
         server.requestHandlerResolver = mRequestHandler;
-
+        if (mKeyManagers != null && mTrustManagers != null) {
+            server.configureSslContext(mKeyManagers, mTrustManagers);
+        }
         return server;
+    }
+
+    public void setSslConfigs(KeyManager[] keyManagers, TrustManager[] trustManagers) {
+        mKeyManagers = keyManagers;
+        mTrustManagers = trustManagers;
     }
 }
