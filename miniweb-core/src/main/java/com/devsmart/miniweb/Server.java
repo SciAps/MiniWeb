@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
@@ -148,15 +148,32 @@ public class Server {
     private class WorkerTask implements Runnable {
 
         private final HttpService httpservice;
-        private final RemoteConnection remoteConnection;
+        private final Socket socket;
 
-        public WorkerTask(HttpService service, RemoteConnection connection) {
+        WorkerTask(HttpService service, Socket socket) {
             httpservice = service;
-            remoteConnection = connection;
+            this.socket = socket;
         }
 
         @Override
         public void run() {
+            SocketAddress remoteAddress = socket.getRemoteSocketAddress();
+            SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
+            RemoteConnection remoteConnection;
+            try {
+                connection.bind(socket, new BasicHttpParams());
+                remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
+                mActiveConnections.add(remoteConnection);
+            } catch (SSLException e) {
+                LOGGER.warn("TLS handshake failed from {}: {}", remoteAddress, e.getMessage());
+                closeSocket(socket);
+                return;
+            } catch (Exception e) {
+                LOGGER.warn("Failed to establish connection from {}: {}", remoteAddress, e.getMessage());
+                closeSocket(socket);
+                return;
+            }
+
             try {
                 while(mRunning && remoteConnection.connection.isOpen()) {
                     BasicHttpContext context = new BasicHttpContext();
@@ -217,26 +234,13 @@ public class Server {
                     if (mIsDebugBuild) {
                         LOGGER.info("accepting connection from: {}", socket.getRemoteSocketAddress());
                     }
-                    SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
-                    connection.bind(socket, new BasicHttpParams());
-                    RemoteConnection remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
-
-                    mActiveConnections.add(remoteConnection);
-                    mWorkerThreads.execute(new WorkerTask(httpService, remoteConnection));
-                } catch (SocketTimeoutException e) {
-                    // ignore and continue
-                } catch (SSLException e) {
-                    LOGGER.warn("TLS handshake failed from {}: {}",
-                                socket != null ? socket.getRemoteSocketAddress() : "unknown", e.getMessage());
-                    closeSocket(socket);
+                    mWorkerThreads.execute(new WorkerTask(httpService, socket));
+                    socket = null; // handed off to the worker; this loop must not close it
                 } catch (SocketException e) {
                     LOGGER.info("SocketListener shutting down");
                     mRunning = false;
                 } catch (IOException e) {
                     LOGGER.error("I/O error", e);
-                    mRunning = false;
-                } catch (ClassCastException e) {
-                    LOGGER.error("Expected SSLSocket when SSL is enabled; check server socket setup", e);
                     mRunning = false;
                 }
             }
