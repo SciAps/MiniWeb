@@ -28,17 +28,18 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
 public class Server {
@@ -59,6 +60,7 @@ public class Server {
     private volatile boolean mRunning = false;
     private SSLContext mSslContext;
     private boolean mSslEnabled = false;
+    private String[] mEnabledProtocols = new String[0];
 
     public void configureSslContext(KeyManager[] keyManagers, TrustManager[] trustManagers)  {
         try {
@@ -78,30 +80,15 @@ public class Server {
             return;
         }
 
-        if (mSslEnabled && mSslContext != null) {
-            SSLServerSocketFactory factory = mSslContext.getServerSocketFactory();
-            mServerSocket = factory.createServerSocket();
-        } else {
-            ServerSocketFactory factory = ServerSocketFactory.getDefault();
-            mServerSocket = factory.createServerSocket();
-        }
-
+        mServerSocket = ServerSocketFactory.getDefault().createServerSocket();
         mServerSocket.setReuseAddress(true);
         mServerSocket.bind(new InetSocketAddress(port));
 
-        if (mSslEnabled && mServerSocket instanceof SSLServerSocket) {
-            SSLServerSocket sslServerSocket = (SSLServerSocket) mServerSocket;
-            sslServerSocket.setNeedClientAuth(true);
-            String[] supported = sslServerSocket.getSupportedProtocols();
-            String[] desired = new String[]{"TLSv1.3", "TLSv1.2"};
-            String[] filtered = Arrays.stream(desired)
-                                      .filter(p -> Arrays.asList(supported).contains(p))
+        if (mSslEnabled) {
+            List<String> supported = Arrays.asList(mSslContext.getSupportedSSLParameters().getProtocols());
+            mEnabledProtocols = Stream.of("TLSv1.3", "TLSv1.2")
+                                      .filter(supported::contains)
                                       .toArray(String[]::new);
-            if (filtered.length > 0) {
-                sslServerSocket.setEnabledProtocols(filtered);
-            }
-            LOGGER.info("SSL server socket configured: clientAuth=required, protocols={}",
-                        Arrays.toString(sslServerSocket.getEnabledProtocols()));
         }
 
         if (mIsDebugBuild) {
@@ -148,7 +135,7 @@ public class Server {
     private class WorkerTask implements Runnable {
 
         private final HttpService httpservice;
-        private final Socket socket;
+        private Socket socket;
 
         WorkerTask(HttpService service, Socket socket) {
             httpservice = service;
@@ -161,6 +148,9 @@ public class Server {
             SSLSafeHttpServerConnection connection = new SSLSafeHttpServerConnection();
             RemoteConnection remoteConnection;
             try {
+                if (mSslEnabled) {
+                    socket = startSsl(socket);
+                }
                 connection.bind(socket, new BasicHttpParams());
                 remoteConnection = new RemoteConnection(socket.getInetAddress(), connection);
                 mActiveConnections.add(remoteConnection);
@@ -259,6 +249,22 @@ public class Server {
         }
     }
 
+    private SSLSocket startSsl(Socket socket) throws IOException {
+        String peerIp = socket.getInetAddress().getHostAddress();
+        SSLSocket sslSocket = (SSLSocket) mSslContext.getSocketFactory()
+                                                     .createSocket(socket, peerIp, socket.getPort(), true);
+        try {
+            sslSocket.setUseClientMode(false);
+            sslSocket.setNeedClientAuth(true);
+            if (mEnabledProtocols.length > 0) {
+                sslSocket.setEnabledProtocols(mEnabledProtocols);
+            }
+            return sslSocket;
+        } catch (RuntimeException e) {
+            closeSocket(sslSocket);
+            throw e;
+        }
+    }
 
     // HttpCore's DefaultHttpServerConnection.close() calls Socket.shutdownOutput(), which Android's SSL
     // socket implementation does not support and other layers may have already closed. This subclass
