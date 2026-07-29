@@ -116,7 +116,7 @@ public class Server {
             for (RemoteConnection remoteConnection : mActiveConnections) {
                 try {
                     remoteConnection.connection.shutdown();
-                } catch (IOException e) {
+                } catch (UnsupportedOperationException | IOException e) {
                     LOGGER.warn("Error shutting down connection {}: {}", remoteConnection.connection, e.getMessage());
                 }
             }
