@@ -59,6 +59,7 @@ public class ControllerInvoker implements HttpRequestHandler {
             }
             // A param handler that already rejected the request (e.g. an unparseable query string).
             if (response.getStatusLine().getStatusCode() == HttpStatus.SC_BAD_REQUEST) {
+                respondBadRequest(response, "malformed query string");
                 return;
             }
             // Method.invoke cannot pass null for a primitive; it would surface as a 500.
