@@ -71,7 +71,9 @@ public class ControllerInvoker implements HttpRequestHandler {
 
         try {
             Object retval = method.invoke(instance, params);
-            if(serializeRetval){
+            final boolean hasOwnErrorBody = response.getStatusLine().getStatusCode() >= HttpStatus.SC_BAD_REQUEST
+                    && response.getEntity() != null;
+            if (serializeRetval && !hasOwnErrorBody) {
                 Gson gson = getGson();
                 String respStr = gson.toJson(retval);
                 StringEntity respEntity = new StringEntity(respStr, HTTP.UTF_8);
