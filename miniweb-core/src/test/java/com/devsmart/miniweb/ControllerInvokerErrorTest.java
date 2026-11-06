@@ -63,6 +63,13 @@ public class ControllerInvokerErrorTest {
         public String echo(@RequestParam("name") String name) {
             return name;
         }
+
+        @RequestMapping(value = "rejectsWithWriter")
+        @Body
+        public String rejectsWithWriter(JsonWriter writer, HttpResponse response) {
+            response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+            return "error value";
+        }
     }
 
     private static HttpResponse send(String uri) throws Exception {
@@ -113,6 +120,18 @@ public class ControllerInvokerErrorTest {
     @Test
     public void anErrorBodyTheHandlerSetIsKept() throws Exception {
         assertBadRequest(send("/bad/rejects"), "own reason");
+    }
+
+    /**
+     * The JsonWriter's pipe is not a body the handler chose. Taken for one, serialization was skipped and reading the
+     * response blocked on the open pipe - hence the timeout.
+     */
+    @Test(timeout = 5000)
+    public void anUntouchedJsonWriterPipeIsReplacedBySerialization() throws Exception {
+        final HttpResponse response = send("/bad/rejectsWithWriter");
+
+        assertEquals(HttpStatus.SC_BAD_REQUEST, response.getStatusLine().getStatusCode());
+        assertEquals("\"error value\"", EntityUtils.toString(response.getEntity()));
     }
 
     @Test

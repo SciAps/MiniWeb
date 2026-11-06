@@ -5,6 +5,7 @@ import com.devsmart.miniweb.utils.RequestMethod;
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonWriter;
 
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -69,16 +70,22 @@ public class ControllerInvoker implements HttpRequestHandler {
             }
         }
 
+        // Non-null only when a JsonWriter param installed its pipe.
+        final HttpEntity injectedEntity = response.getEntity();
         try {
             Object retval = method.invoke(instance, params);
+            final HttpEntity entity = response.getEntity();
             final boolean hasOwnErrorBody = response.getStatusLine().getStatusCode() >= HttpStatus.SC_BAD_REQUEST
-                    && response.getEntity() != null;
+                    && entity != null && entity != injectedEntity;
             if (serializeRetval && !hasOwnErrorBody) {
                 Gson gson = getGson();
                 String respStr = gson.toJson(retval);
                 StringEntity respEntity = new StringEntity(respStr, HTTP.UTF_8);
                 respEntity.setContentType("application/json");
                 response.setEntity(respEntity);
+                if (injectedEntity != null && entity == injectedEntity) {
+                    injectedEntity.getContent().close();
+                }
             }
         } catch (Exception e) {
             logger.error("error invoking controller method: {}:{}", instance.getClass().getName(), method.getName(), e);
